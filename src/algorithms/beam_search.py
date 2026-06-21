@@ -1,13 +1,13 @@
-import heapq
 from .base import SearchAlgorithm
 
 
-class GreedyBestFirst(SearchAlgorithm):
-    name = "Greedy Best-First"
+class BeamSearch(SearchAlgorithm):
+    name = "Beam Search"
+    BEAM_WIDTH = 3
 
     def __init__(self):
         super().__init__()
-        self._pq = None
+        self._frontier = []
         self._seen = set()
 
     def _heuristic(self, pos, goal):
@@ -16,19 +16,19 @@ class GreedyBestFirst(SearchAlgorithm):
     def setup(self, grid, start, goal):
         super().setup(grid, start, goal)
         h = self._heuristic(start, goal)
-        self._pq = [(h, start)]
+        self._frontier = [(h, start)]
         self._seen = {start}
         self._came_from = {start: None}
 
     def step(self):
         if self._done:
-            return self._make_state([], True, self._path)
+            return self._make_state(self._frontier, True, self._path)
 
-        if not self._pq:
+        if not self._frontier:
             self._done = True
             return self._make_state([], True, None)
 
-        _, current = heapq.heappop(self._pq)
+        current_h, current = self._frontier.pop(0)
         self._visited.add(current)
         self._current = current
         self.stats["nodes_visited"] = len(self._visited)
@@ -43,6 +43,10 @@ class GreedyBestFirst(SearchAlgorithm):
                 self._seen.add(neighbor)
                 self._came_from[neighbor] = current
                 h = self._heuristic(neighbor, self.goal)
-                heapq.heappush(self._pq, (h, neighbor))
+                self._frontier.append((h, neighbor))
 
-        return self._make_state(self._pq, False)
+        # Manter apenas os BEAM_WIDTH melhores por heuristica
+        self._frontier.sort(key=lambda x: x[0])
+        self._frontier = self._frontier[:self.BEAM_WIDTH]
+
+        return self._make_state(self._frontier, False)

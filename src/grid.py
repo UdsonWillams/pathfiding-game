@@ -9,6 +9,8 @@ class Cell:
         self.visited = False
         self.is_path = False
         self.is_frontier = False
+        self.is_frontier_b = False
+        self.is_visited_b = False
 
     @property
     def cost(self):
@@ -63,8 +65,10 @@ class Grid:
                 cell.visited = False
                 cell.is_path = False
                 cell.is_frontier = False
+                cell.is_frontier_b = False
+                cell.is_visited_b = False
 
-    def update_visual_state(self, front=None, visited_positions=None, path=None):
+    def update_visual_state(self, front=None, visited_positions=None, path=None, front_b=None, visited_b=None):
         self.reset_visual_state()
         if visited_positions:
             for pos in visited_positions:
@@ -82,6 +86,17 @@ class Grid:
                 cell = self.get_cell(*pos)
                 if cell:
                     cell.is_path = True
+        if visited_b:
+            for pos in visited_b:
+                cell = self.get_cell(*pos)
+                if cell:
+                    cell.is_visited_b = True
+        if front_b:
+            for pos in front_b:
+                if isinstance(pos, tuple) and len(pos) == 2:
+                    cell = self.get_cell(*pos)
+                    if cell:
+                        cell.is_frontier_b = True
 
     def to_level_data(self):
         data = []

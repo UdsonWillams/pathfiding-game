@@ -171,8 +171,106 @@ ALGORITHM_INFO["greedy"] = AlgorithmInfo(
 )
 
 
+ALGORITHM_INFO["bidir_bfs"] = AlgorithmInfo(
+    key="bidir_bfs",
+    name="Busca Bidirecional",
+    algo_id="BiDir BFS",
+    badges=["Caminho otimo: sim", "Velocidade: muito rapida", "Memoria: media"],
+    badges_colors=[(46, 204, 113), (46, 204, 113), (241, 196, 15)],
+    how_it_works=[
+        "A ideia: ao inves de expandir so do start",
+        "ate o goal, expandemos do start E do goal",
+        "simultaneamente.",
+        "",
+        "A cada step: expande um no da frente",
+        "forward (comecar → meta) e um da",
+        "frente backward (meta → comecar).",
+        "",
+        "Quando as duas frentes se encontram",
+        "(um no e visitado de ambos lados),",
+        "temos o caminho: junta forward path",
+        "com backward path (invertido).",
+        "",
+        "Visualmente: duas ondas azuis (forward)",
+        "e roxas (backward) se aproximando.",
+    ],
+    when_to_use=[
+        "- Para caminhos muito longos.",
+        "- Quando quer aprender buscas avancadas.",
+        "- Nao funciona bem com goal dinamico.",
+        "- Melhor em grids sem terreno pesado.",
+    ],
+)
+
+ALGORITHM_INFO["beam"] = AlgorithmInfo(
+    key="beam",
+    name="Beam Search",
+    algo_id="Beam",
+    badges=["Caminho otimo: NAO", "Velocidade: muito rapida", "Memoria: minima"],
+    badges_colors=[(231, 76, 60), (46, 204, 113), (46, 204, 113)],
+    how_it_works=[
+        "Beam Search e como BFS, mas com uma",
+        "restricao: mantem no maximo W candidatos",
+        "no frontier. Aqui W=3.",
+        "",
+        "A cada step: expande o candidato mais",
+        "promissor (menor heuristica), adiciona",
+        "vizinhos, re-ordena por heuristica,",
+        "e descarta os piores ate ficar com",
+        "no maximo W.",
+        "",
+        "Resultado: busca rapida e com pouca",
+        "memoria, mas pode perder o caminho",
+        "otimo se o beam fico muito estreito.",
+        "",
+        "Visualmente: frontier sempre pequena,",
+        "apenas 3 nos azuis max no grafico.",
+    ],
+    when_to_use=[
+        "- Quando velocidade importa muito.",
+        "- Mapas abertos sem muitos detalhes.",
+        "- Para entender tradeoff qualidade×",
+        "  velocidade.",
+        "- NAO recomendado para gameplay serio.",
+    ],
+)
+
+ALGORITHM_INFO["idastar"] = AlgorithmInfo(
+    key="idastar",
+    name="IDA* (Iterative Deepening)",
+    algo_id="IDA*",
+    badges=["Caminho otimo: sim", "Velocidade: media", "Memoria: minima"],
+    badges_colors=[(46, 204, 113), (241, 196, 15), (46, 204, 113)],
+    how_it_works=[
+        "IDA* e uma mistura de Iterative",
+        "Deepening (de DFS) com A*.",
+        "",
+        "Cada iteracao: DFS com um threshold",
+        "de f-score. Se achar o goal, pronto.",
+        "Se nao, aumenta o threshold e",
+        "reinicia, agora explorando mais fundo.",
+        "",
+        "Resultado: busca otima com pouquissima",
+        "memoria (so mantem a stack).",
+        "Custo: revisita muitos nos entre",
+        "iteracoes.",
+        "",
+        "Visualmente: cada iteracao apaga e",
+        "recomeca a busca (os visitados azuis",
+        "desaparecem e voltam a crescer).",
+    ],
+    when_to_use=[
+        "- Quando memoria e limitada (ex: puzzles",
+        "  de 15-puzzle).",
+        "- Grids sem terreno pesado.",
+        "- Interessante academicamente.",
+        "- Lento em praticamente todos os mapas.",
+    ],
+)
+
+
 def get_algorithm_info(algo_idx):
-    keys = ["bfs", "dfs", "dijkstra", "astar", "greedy"]
+    keys = ["bfs", "dfs", "dijkstra", "astar", "greedy", "bidir_bfs", "beam", "idastar"]
     if 0 <= algo_idx < len(keys):
         return ALGORITHM_INFO.get(keys[algo_idx])
     return None

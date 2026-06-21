@@ -9,6 +9,8 @@ from src.algorithms.dfs import DFS
 from src.algorithms.dijkstra import Dijkstra
 from src.algorithms.astar import AStar
 from src.algorithms.greedy import GreedyBestFirst
+from src.levels import LEVELS, get_level
+from src.constants import DIFF_EASY, DIFF_MEDIUM, DIFF_HARD, DIFF_EXTREME
 
 
 def create_open_grid(rows=5, cols=5):
@@ -155,3 +157,25 @@ class TestAllAlgorithms:
             f"A* visited {a_visited} nodes, Dijkstra visited {d_visited}. "
             f"A* should visit fewer or similar nodes."
         )
+
+
+class TestLevels:
+    def test_every_level_is_solvable(self):
+        for i in range(len(LEVELS)):
+            level = get_level(i)
+            grid = level["grid"]
+            assert grid.start is not None, f"Fase sem start: {level['name']}"
+            assert grid.goal is not None, f"Fase sem goal: {level['name']}"
+            _, cost = run_algorithm(AStar, grid)
+            assert cost != float("inf"), f"Fase sem solucao: {level['name']}"
+
+    def test_level_count_per_difficulty(self):
+        counts = {DIFF_EASY: 0, DIFF_MEDIUM: 0, DIFF_HARD: 0, DIFF_EXTREME: 0}
+        for level in LEVELS:
+            counts[level["difficulty"]] += 1
+        assert counts == {
+            DIFF_EASY: 5,
+            DIFF_MEDIUM: 5,
+            DIFF_HARD: 5,
+            DIFF_EXTREME: 3,
+        }, f"Distribuicao inesperada: {counts}"

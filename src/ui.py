@@ -1,3 +1,4 @@
+import math
 import pygame
 from .constants import (
     WINDOW_WIDTH,
@@ -45,9 +46,6 @@ class UI:
             rect = surf.get_rect(topleft=(x, y))
         self.surface.blit(surf, rect)
         return rect
-
-    def draw_text_right(self, text, x, y, color=COLOR_TEXT, font=None):
-        return self.draw_text(text, x, y, color, font, center_x=False)
 
     def draw_button(self, rect, text, hover=False, active=False, disabled=False, font=None):
         if font is None:
@@ -101,7 +99,7 @@ class UI:
         self.draw_text(text, WINDOW_WIDTH // 2, y, COLOR_TEXT_DIM, self.font_large, center_x=True)
 
     def draw_stars(self, cx, y, stars, size=24):
-        total_w = stars * size + (stars - 1) * 4
+        total_w = 3 * size + 2 * 4
         start_x = cx - total_w // 2
         for i in range(3):
             star_x = start_x + i * (size + 4)
@@ -117,8 +115,6 @@ class UI:
         for i in range(10):
             angle = i * 36 - 90
             r = outer if i % 2 == 0 else inner
-            import math
-
             px = cx + r * math.cos(math.radians(angle))
             py = cy + r * math.sin(math.radians(angle))
             points.append((px, py))

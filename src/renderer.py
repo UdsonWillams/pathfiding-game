@@ -1,3 +1,4 @@
+import math
 import pygame
 from .constants import (
     GAME_AREA_WIDTH,
@@ -19,6 +20,8 @@ from .constants import (
     COLOR_WATER,
     COLOR_VISITED,
     COLOR_FRONTIER,
+    COLOR_VISITED_B,
+    COLOR_FRONTIER_B,
     COLOR_PATH,
     COLOR_PLAYER,
     COLOR_PLAYER_GLOW,
@@ -60,6 +63,15 @@ class Renderer:
         self.font_large = pygame.font.SysFont("consolas", 22)
         self.font_title = pygame.font.SysFont("consolas", 28, bold=True)
         self._cell_size = 20
+        self._sidebar_scroll = 0
+        self._sidebar_content_h = 0
+
+    _STATS_PANEL_H = 200
+
+    def scroll_sidebar(self, delta):
+        scroll_area_h = WINDOW_HEIGHT - self._STATS_PANEL_H
+        max_scroll = max(0, self._sidebar_content_h - scroll_area_h)
+        self._sidebar_scroll = max(0, min(self._sidebar_scroll + delta, max_scroll))
 
     def draw_background(self):
         self.surface.fill(COLOR_BG)
@@ -96,8 +108,12 @@ class Renderer:
                 color = CELL_COLORS.get(cell.cell_type, COLOR_EMPTY)
                 if cell.is_path:
                     color = COLOR_PATH
+                elif cell.is_frontier_b:
+                    color = COLOR_FRONTIER_B
                 elif cell.is_frontier:
                     color = COLOR_FRONTIER
+                elif cell.is_visited_b:
+                    color = COLOR_VISITED_B
                 elif cell.visited:
                     color = COLOR_VISITED
 
@@ -117,9 +133,9 @@ class Renderer:
                 pygame.draw.rect(self.surface, COLOR_GRID_LINE, rect, 1)
 
                 if cell.cell_type == CELL_START:
-                    self._draw_label("S", x + w // 2, y + h // 2, COLOR_EMPTY)
+                    self._draw_start_marker(x, y, w, h)
                 elif cell.cell_type == CELL_GOAL:
-                    self._draw_label("G", x + w // 2, y + h // 2, COLOR_EMPTY)
+                    self._draw_goal_marker(x, y, w, h, cell)
 
         if highlight_cell:
             x, y, w, h = self.cell_to_pixel(*highlight_cell)
@@ -136,6 +152,57 @@ class Renderer:
         self.surface.blit(glow_surf, (cx - glow_radius, cy - glow_radius))
         radius = max(w, h) // 2 - 2
         pygame.draw.circle(self.surface, COLOR_PLAYER, (cx, cy), radius)
+
+    def _draw_start_marker(self, x, y, w, h):
+        cx, cy = x + w // 2, y + h // 2
+        if w >= 10:
+            t = pygame.time.get_ticks()
+            pulse = 0.65 + 0.35 * math.sin(t * 0.003)
+            r = max(3, min(w, h) // 2 - 1)
+            ring_v = int(180 + 75 * pulse)
+            pygame.draw.circle(self.surface, (ring_v, ring_v, ring_v), (cx, cy), r, max(1, r // 3))
+        self._draw_label("S", cx, cy, (255, 255, 255))
+
+    def _draw_goal_marker(self, x, y, w, h, cell=None):
+        cx, cy = x + w // 2, y + h // 2
+        t = pygame.time.get_ticks()
+        pulse = 0.7 + 0.3 * math.sin(t * 0.004 + 1.5)
+        on_path = cell is not None and cell.is_path
+        if w >= 14:
+            r = max(3, min(w, h) // 2 - 2)
+            label_off = max(1, h // 6)
+            star_color = (255, 255, 255) if on_path else (int(255 * pulse), int(210 * pulse), 20)
+            self._draw_star_shape(cx, cy - label_off, max(3, r - 1), star_color)
+            self._draw_label("G", cx, cy + label_off, (255, 255, 255))
+        elif w >= 8:
+            r = max(2, min(w, h) // 2 - 1)
+            ring_color = (255, 255, 255) if on_path else (int(255 * pulse), int(210 * pulse), 20)
+            pygame.draw.circle(self.surface, ring_color, (cx, cy), r, max(1, r // 3))
+            self._draw_label("G", cx, cy, (255, 255, 255))
+        else:
+            self._draw_label("G", cx, cy, (255, 255, 255))
+
+    def _draw_star_shape(self, cx, cy, r, color):
+        pts = []
+        inner = max(1, r // 2)
+        for i in range(10):
+            angle = i * math.pi / 5 - math.pi / 2
+            radius = r if i % 2 == 0 else inner
+            pts.append((int(cx + radius * math.cos(angle)), int(cy + radius * math.sin(angle))))
+        if len(pts) >= 3:
+            pygame.draw.polygon(self.surface, color, pts)
+
+    def draw_player_trail(self, path):
+        if not path or len(path) < 2:
+            return
+        count = len(path) - 1
+        for i, pos in enumerate(path[:-1]):
+            alpha = int(35 + 65 * (i / max(count, 1)))
+            r, c = pos
+            x, y, w, h = self.cell_to_pixel(r, c)
+            trail_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.circle(trail_surf, (230, 126, 34, alpha), (w // 2, h // 2), max(2, w // 3))
+            self.surface.blit(trail_surf, (x, y))
 
     def draw_sidebar(self, title="", lines=None):
         sidebar_rect = pygame.Rect(GAME_AREA_WIDTH, 0, SIDEBAR_WIDTH, WINDOW_HEIGHT)
@@ -162,20 +229,42 @@ class Renderer:
                 self.surface.blit(surf, (GAME_AREA_WIDTH + 15, y))
                 y += 20
 
-    def draw_rich_sidebar(self, algo_info, stats_texts=None, live_info=None):
+    def draw_rich_sidebar(self, algo_info, log_lines=None, live_info=None):
         sidebar_x = GAME_AREA_WIDTH
-        sidebar_rect = pygame.Rect(sidebar_x, 0, SIDEBAR_WIDTH, WINDOW_HEIGHT)
-        pygame.draw.rect(self.surface, COLOR_SIDEBAR_BG, sidebar_rect)
-        pygame.draw.line(
-            self.surface,
-            (60, 65, 70),
-            (sidebar_x, 0),
-            (sidebar_x, WINDOW_HEIGHT),
-            2,
-        )
+        pygame.draw.rect(self.surface, COLOR_SIDEBAR_BG, pygame.Rect(sidebar_x, 0, SIDEBAR_WIDTH, WINDOW_HEIGHT))
+        pygame.draw.line(self.surface, (60, 65, 70), (sidebar_x, 0), (sidebar_x, WINDOW_HEIGHT), 2)
 
         x = sidebar_x + 15
-        y = 15
+        scroll_area_h = WINDOW_HEIGHT - self._STATS_PANEL_H
+
+        # ── Fixed bottom panel: logs ─────────────────────────────────────
+        sep_y = scroll_area_h
+        pygame.draw.line(self.surface, (70, 75, 80),
+                         (sidebar_x + 5, sep_y), (sidebar_x + SIDEBAR_WIDTH - 5, sep_y), 1)
+
+        y = sep_y + 10
+        if live_info:
+            lbl = self.font_small.render("Ao vivo (A*):", True, COLOR_TEXT)
+            self.surface.blit(lbl, (x, y))
+            y += 18
+            for line in live_info:
+                if y > WINDOW_HEIGHT - 4:
+                    break
+                y = self._draw_rich_line(line, x, y, default_color=COLOR_TEXT_DIM)
+
+        if log_lines:
+            for text, color in log_lines:
+                if y > WINDOW_HEIGHT - 4:
+                    break
+                surf = self.font_small.render(text, True, color)
+                self.surface.blit(surf, (x, y))
+                y += 18
+
+        # ── Scrollable top: algorithm description ────────────────────────
+        old_clip = self.surface.get_clip()
+        self.surface.set_clip(pygame.Rect(sidebar_x, 0, SIDEBAR_WIDTH, scroll_area_h))
+
+        y = 15 - self._sidebar_scroll
 
         title_surf = self.font_large.render(algo_info.name, True, COLOR_TEXT)
         self.surface.blit(title_surf, (x, y))
@@ -195,8 +284,6 @@ class Renderer:
         y += 22
 
         for line in algo_info.how_it_works:
-            if y > WINDOW_HEIGHT - 100:
-                break
             y = self._draw_rich_line(line, x, y)
 
         y += 6
@@ -205,32 +292,47 @@ class Renderer:
         y += 22
 
         for line in algo_info.when_to_use:
-            if y > WINDOW_HEIGHT - 12:
-                break
             y = self._draw_rich_line(line, x, y, default_color=COLOR_TEXT_DIM)
 
-        if live_info:
-            y += 8
-            pygame.draw.line(self.surface, (70, 75, 80), (x, y), (x + SIDEBAR_WIDTH - 30, y))
-            y += 10
-            info_surf = self.font_small.render("Ao vivo:", True, COLOR_TEXT)
-            self.surface.blit(info_surf, (x, y))
-            y += 20
-            for line in live_info:
-                if y > WINDOW_HEIGHT - 12:
-                    break
-                y = self._draw_rich_line(line, x, y, default_color=COLOR_TEXT_DIM)
+        y += 8
+        pygame.draw.line(self.surface, (70, 75, 80), (x, y), (x + SIDEBAR_WIDTH - 30, y))
+        y += 10
 
-        if stats_texts:
-            y += 8
-            pygame.draw.line(self.surface, (70, 75, 80), (x, y), (x + SIDEBAR_WIDTH - 30, y))
-            y += 12
-            for text, color in stats_texts:
-                if y > WINDOW_HEIGHT - 12:
-                    break
-                stat_surf = self.font_small.render(text, True, color)
-                self.surface.blit(stat_surf, (x, y))
-                y += 18
+        shortcuts = [
+            ("Atalhos:", COLOR_TEXT),
+            ("Espaco = Play / Pause", COLOR_TEXT_DIM),
+            ("R = Reset   ESC = Niveis", COLOR_TEXT_DIM),
+            ("<- -> = Velocidade (1-5)", COLOR_TEXT_DIM),
+            ("TAB = Comparar com A*", COLOR_TEXT_DIM),
+            ("Clique = editar celula", COLOR_TEXT_DIM),
+            ("Dir. = desfazer edicao", COLOR_TEXT_DIM),
+            ("", COLOR_TEXT),
+            ("Legenda:", COLOR_TEXT),
+            ("Azul = fronteira", COLOR_TEXT_DIM),
+            ("Cinza = visitado", COLOR_TEXT_DIM),
+            ("Amarelo = caminho", COLOR_TEXT_DIM),
+            ("S = Start   G = Goal", COLOR_TEXT_DIM),
+            ("", COLOR_TEXT),
+            ("Role o mouse para mais", COLOR_TEXT_DIM),
+        ]
+        for text, color in shortcuts:
+            surf = self.font_small.render(text, True, color)
+            self.surface.blit(surf, (x, y))
+            y += 18
+
+        self._sidebar_content_h = y + self._sidebar_scroll - 15
+
+        self.surface.set_clip(old_clip)
+
+        # Scrollbar
+        if self._sidebar_content_h > scroll_area_h:
+            bar_x = sidebar_x + SIDEBAR_WIDTH - 5
+            ratio = scroll_area_h / max(self._sidebar_content_h, 1)
+            bar_h = max(20, int(scroll_area_h * ratio))
+            max_scroll = self._sidebar_content_h - scroll_area_h
+            bar_y = int(self._sidebar_scroll * (scroll_area_h - bar_h) / max(1, max_scroll))
+            pygame.draw.rect(self.surface, (55, 60, 65), (bar_x, 0, 4, scroll_area_h))
+            pygame.draw.rect(self.surface, (110, 115, 125), (bar_x, bar_y, 4, bar_h), border_radius=2)
 
     def _draw_rich_line(self, text, x, y, default_color=COLOR_TEXT):
         if not text:
@@ -331,14 +433,17 @@ class Renderer:
     def draw_bottom_bar(self, algorithm_names, current_algo, playing, steps_per_frame):
         bar_y = WINDOW_HEIGHT - GRID_MARGIN_BOTTOM + 15
         x = GRID_MARGIN_LEFT
+        max_x = GAME_AREA_WIDTH - 80
 
         for i, name in enumerate(algorithm_names):
             btn_rect = pygame.Rect(x, bar_y, 16, 16)
             active = (i == current_algo)
             self.draw_button(btn_rect, str(i + 1), active=active)
             x += 22
-            self.draw_text(name, x, bar_y, COLOR_TEXT, self.font_small)
-            x += self.font_small.size(name)[0] + 16
+            name_w = self.font_small.size(name)[0]
+            if x + name_w <= max_x:
+                self.draw_text(name, x, bar_y, COLOR_TEXT, self.font_small)
+            x += name_w + 16
 
         icon = "II" if playing else ">"
         btn_rect = pygame.Rect(x, bar_y, 40, 20)
@@ -349,7 +454,7 @@ class Renderer:
 
     def draw_stats(self, nodes_visited, path_cost, elapsed_ms):
         x = GRID_MARGIN_LEFT + 30
-        y = 15
+        y = 50
         self.draw_text(f"Visitados: {nodes_visited}", x, y, COLOR_TEXT_DIM, self.font_small)
         x += 180
         self.draw_text(f"Custo: {path_cost}", x, y, COLOR_TEXT_DIM, self.font_small)

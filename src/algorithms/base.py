@@ -10,6 +10,8 @@ class StepState:
     came_from: Dict[Tuple[int, int], Optional[Tuple[int, int]]] = field(default_factory=dict)
     done: bool = False
     path: Optional[List[Tuple[int, int]]] = None
+    frontier_b: List[Tuple[int, int]] = field(default_factory=list)
+    visited_b: Set[Tuple[int, int]] = field(default_factory=set)
 
 
 class SearchAlgorithm:
@@ -61,7 +63,7 @@ class SearchAlgorithm:
                 total += cell.cost
         return total
 
-    def _make_state(self, frontier, done, path=None):
+    def _make_state(self, frontier, done, path=None, frontier_b=None, visited_b=None):
         items = []
         for item in frontier:
             if isinstance(item, tuple) and len(item) >= 2:
@@ -75,4 +77,6 @@ class SearchAlgorithm:
             came_from=self._came_from.copy(),
             done=done,
             path=path,
+            frontier_b=frontier_b if frontier_b else [],
+            visited_b=visited_b if visited_b else set(),
         )
